@@ -4,6 +4,7 @@ import axios from 'axios'
 import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
 import { saveAs } from 'file-saver'
+import * as XLSX from 'xlsx'
 
 // 生成UUID的函数
 function generateUUID() {
@@ -147,66 +148,91 @@ function extractJsonObject(response) {
   }
 }
 
+// 添加状态变量
+const isUploadingLawyer = ref(false)
+const isUploadingParty = ref(false)
+const isPolishing = ref(false)
+
 // 律师信息上传
 const lawyerFileInput = ref(null)
 const uploadLawyerFile = () => {
+  if (isUploadingLawyer.value) return
   lawyerFileInput.value.click()
 }
 const handleLawyerFileChange = async (e) => {
   const file = e.target.files[0]
   if (!file) return
-  const userId = generateUUID()
-  // 先上传文件，拿到fileId
-  const fileId = await uploadFile(file, userId, "Bearer app-rpCGTuvi4T3z1c4wyEK6nNoM")
-  console.log('fileId:', fileId)
-  if (fileId) {
-    // 再调用工作流
-    const response = await runWorkflow(fileId, userId, "Bearer app-rpCGTuvi4T3z1c4wyEK6nNoM")
-    console.log('response:', response)
-    const jsonObject = extractJsonObject(response)
-    console.log('jsonObject:', jsonObject)
-    // 你可以在这里处理response，比如自动填充表单
-    form.value.lawyerName = jsonObject.lawyerName
-    form.value.lawyerGender = jsonObject.lawyerGender
-    form.value.lawyerCompany = jsonObject.lawyerCompany
-    form.value.lawyerLicense = jsonObject.lawyerLicense
-    form.value.lawyerPhone = jsonObject.lawyerPhone
+  
+  isUploadingLawyer.value = true
+  try {
+    const userId = generateUUID()
+    // 先上传文件，拿到fileId
+    const fileId = await uploadFile(file, userId, "Bearer app-rpCGTuvi4T3z1c4wyEK6nNoM")
+    console.log('fileId:', fileId)
+    if (fileId) {
+      // 再调用工作流
+      const response = await runWorkflow(fileId, userId, "Bearer app-rpCGTuvi4T3z1c4wyEK6nNoM")
+      console.log('response:', response)
+      const jsonObject = extractJsonObject(response)
+      console.log('jsonObject:', jsonObject)
+      // 你可以在这里处理response，比如自动填充表单
+      form.value.lawyerName = jsonObject.lawyerName
+      form.value.lawyerGender = jsonObject.lawyerGender
+      form.value.lawyerCompany = jsonObject.lawyerCompany
+      form.value.lawyerLicense = jsonObject.lawyerLicense
+      form.value.lawyerPhone = jsonObject.lawyerPhone
+    }
+  } catch (error) {
+    console.error('律师信息上传失败:', error)
+  } finally {
+    isUploadingLawyer.value = false
   }
 }
 
 // 当事人信息上传
 const partyFileInput = ref(null)
 const uploadPartyFile = () => {
+  if (isUploadingParty.value) return
   partyFileInput.value.click()
 }
 const handlePartyFileChange = async (e) => {
   const file = e.target.files[0]
   if (!file) return
-  const userId = generateUUID()
-  // 先上传文件，拿到fileId
-  const fileId = await uploadFile(file, userId, "Bearer app-Bib8RI7V68t3iI8OOLzv3zGj")
-  if (fileId) {
-    // 再调用工作流
-    const response = await runWorkflow(fileId, userId, "Bearer app-Bib8RI7V68t3iI8OOLzv3zGj")
-    const jsonObject = extractJsonObject(response)
-    // 自动填充当事人相关表单字段
-    if (jsonObject) {
-      form.value.party = jsonObject.party || ''
-      form.value.partyGender = jsonObject.partyGender || ''
-      form.value.partyNation = jsonObject.partyNation || ''
-      form.value.partyBirth = jsonObject.partyBirth || ''
-      form.value.partyId = jsonObject.partyId || ''
-      form.value.partyAddress = jsonObject.partyAddress || ''
+  
+  isUploadingParty.value = true
+  try {
+    const userId = generateUUID()
+    // 先上传文件，拿到fileId
+    const fileId = await uploadFile(file, userId, "Bearer app-dAtXcYbLKmh7dU6nQ8ZxEtnJ")
+    if (fileId) {
+      // 再调用工作流
+      const response = await runWorkflow(fileId, userId, "Bearer app-dAtXcYbLKmh7dU6nQ8ZxEtnJ")
+      const jsonObject = extractJsonObject(response)
+      // 自动填充当事人相关表单字段
+      if (jsonObject) {
+        form.value.party = jsonObject.party || ''
+        form.value.partyGender = jsonObject.partyGender || ''
+        form.value.partyNation = jsonObject.partyNation || ''
+        form.value.partyBirth = jsonObject.partyBirth || ''
+        form.value.partyId = jsonObject.partyId || ''
+        form.value.partyAddress = jsonObject.partyAddress || ''
+      }
     }
+  } catch (error) {
+    console.error('当事人信息上传失败:', error)
+  } finally {
+    isUploadingParty.value = false
   }
 }
 
 // AI辅助润色
 async function polishFactReason() {
+  if (isPolishing.value) return
+  isPolishing.value = true
   const userId = generateUUID()
   const headers = {
     "Content-Type": "application/json",
-    "Authorization": "Bearer app-vgyrizqCxERNrFKq4LNzuyoz"
+    "Authorization": "Bearer app-CfH0z6KLpeHOQDamkFc9RHNk"
   };
   try {
     // 正确传递 factReason.value，避免循环引用
@@ -219,6 +245,8 @@ async function polishFactReason() {
   } catch (e) {
     console.error('AI润色失败:', e)
     // 可选：给用户提示润色失败
+  } finally {
+    isPolishing.value = false
   }
 }
 
@@ -371,11 +399,68 @@ async function saveFile(index) {
       return
     }
     const out = doc.getZip().generate({ type: 'blob' })
-    saveAs(out, '律师调查令申请书' + index + '.docx')
+    saveAs(out, '律师调查令申请书' + bankTable.value[index].account + ' ' + queryTime+ '.docx')
   } catch (e) {
     console.error('读取模板文件失败:', e)
   }
 }
+
+// 银行卡信息上传
+const bankFileInput = ref(null)
+const uploadBankFile = () => {
+  bankFileInput.value.click()
+}
+const handleBankFileChange = async (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  
+  try {
+    const reader = new FileReader()
+    reader.onload = function(e) {
+      const data = new Uint8Array(e.target.result)
+      
+      // 使用 xlsx 库解析 Excel 文件
+      const workbook = XLSX.read(data, { type: 'array' })
+      const sheetName = workbook.SheetNames[0] // 获取第一个工作表
+      const worksheet = workbook.Sheets[sheetName]
+      
+      // 将工作表转换为 JSON 数组
+      const jsonData = XLSX.utils.sheet_to_json(worksheet, { header: 1 })
+      
+      // 清空现有数据
+      bankTable.value = []
+      
+      // 跳过表头，从第二行开始读取
+      for (let i = 1; i < jsonData.length; i++) {
+        const row = jsonData[i]
+        if (row && row.length >= 3) {
+          bankTable.value.push({
+            name: row[0] || '',
+            number: row[1] || '',
+            account: row[2] || ''
+          })
+        }
+      }
+      
+      console.log('银行卡信息已导入:', bankTable.value)
+    }
+    reader.readAsArrayBuffer(file)
+  } catch (error) {
+    console.error('读取Excel文件失败:', error)
+    alert('读取Excel文件失败，请确保文件格式正确')
+  }
+}
+
+// 下载模板文件
+const downloadTemplate = () => {
+  const link = document.createElement('a')
+  link.href = '/律师调查令信息填充模板.xlsx'
+  link.download = '律师调查令信息填充模板.xlsx'
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 </script>
 
 <template>
@@ -409,7 +494,9 @@ async function saveFile(index) {
         <div class="form-section">
           <div class="section-title-row">
             <div class="section-title">当事人信息</div>
-            <button type="button" class="upload-btn" @click="uploadPartyFile">录入文件信息</button>
+            <button type="button" class="upload-btn" :class="{ 'uploading': isUploadingParty }" :disabled="isUploadingParty" @click="uploadPartyFile">
+              {{ isUploadingParty ? '正在录入' : '录入文件信息' }}
+            </button>
             <input ref="partyFileInput" type="file" style="display:none" @change="handlePartyFileChange" />
           </div>
           <div class="form-item">
@@ -446,7 +533,14 @@ async function saveFile(index) {
           </div>
           <!-- 银行卡信息表格 -->
           <div class="form-item">
-            <label style="margin-bottom:8px;">当事人银行卡信息</label>
+            <div class="bank-info-header">
+              <label style="margin-bottom:8px;">当事人银行卡信息</label>
+              <div class="bank-buttons">
+                <button type="button" class="download-btn" @click="downloadTemplate">下载模板</button>
+                <button type="button" class="upload-btn" @click="uploadBankFile">录入银行卡信息</button>
+                <input ref="bankFileInput" type="file" accept=".xlsx,.xls,.csv" style="display:none" @change="handleBankFileChange" />
+              </div>
+            </div>
             <table class="bank-table">
               <thead>
                 <tr>
@@ -475,7 +569,9 @@ async function saveFile(index) {
         <div class="form-section">
           <div class="section-title-row">
             <div class="section-title">律师信息</div>
-            <button type="button" class="upload-btn" @click="uploadLawyerFile">录入文件信息</button>
+            <button type="button" class="upload-btn" :class="{ 'uploading': isUploadingLawyer }" :disabled="isUploadingLawyer" @click="uploadLawyerFile">
+              {{ isUploadingLawyer ? '正在录入' : '录入文件信息' }}
+            </button>
             <input ref="lawyerFileInput" type="file" style="display:none" @change="handleLawyerFileChange" />
           </div>
           <div class="form-item">
@@ -507,7 +603,9 @@ async function saveFile(index) {
           <label>事实和理由</label>
           <div class="fact-reason-flex">
             <textarea v-model="factReason" class="fact-reason-textarea" placeholder="请输入事实和理由"></textarea>
-            <button type="button" class="ai-polish-btn" @click="polishFactReason">AI辅助润色</button>
+            <button type="button" class="ai-polish-btn" :class="{ 'uploading': isPolishing }" :disabled="isPolishing" @click="polishFactReason">
+              {{ isPolishing ? '正在生成' : 'AI辅助润色' }}
+            </button>
           </div>
         </div>
         <div class="form-item">
@@ -739,5 +837,44 @@ async function saveFile(index) {
 
 .ai-polish-btn:hover {
   background: #4caf50;
+}
+
+.bank-info-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.bank-buttons {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.download-btn {
+  background: #409eff;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 12px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.download-btn:hover {
+  background: #337ecc;
+}
+.upload-btn:disabled {
+  background: #c0c4cc;
+  cursor: not-allowed;
+}
+.upload-btn.uploading {
+  background: #c0c4cc;
+}
+.ai-polish-btn:disabled {
+  background: #c0c4cc;
+  cursor: not-allowed;
+}
+.ai-polish-btn.uploading {
+  background: #c0c4cc;
 }
 </style>
