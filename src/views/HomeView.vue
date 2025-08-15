@@ -1,5 +1,5 @@
 <script setup>
-import { ref } from 'vue'
+import { ref, computed } from 'vue'
 import axios from 'axios'
 import PizZip from 'pizzip'
 import Docxtemplater from 'docxtemplater'
@@ -167,11 +167,11 @@ const handleLawyerFileChange = async (e) => {
   try {
     const userId = generateUUID()
     // 先上传文件，拿到fileId
-    const fileId = await uploadFile(file, userId, "Bearer app-rpCGTuvi4T3z1c4wyEK6nNoM")
+    const fileId = await uploadFile(file, userId, 'Bearer ' + localStorage.getItem('lawyerKey'))
     console.log('fileId:', fileId)
     if (fileId) {
       // 再调用工作流
-      const response = await runWorkflow(fileId, userId, "Bearer app-rpCGTuvi4T3z1c4wyEK6nNoM")
+      const response = await runWorkflow(fileId, userId, 'Bearer ' + localStorage.getItem('lawyerKey'))
       console.log('response:', response)
       const jsonObject = extractJsonObject(response)
       console.log('jsonObject:', jsonObject)
@@ -203,10 +203,10 @@ const handlePartyFileChange = async (e) => {
   try {
     const userId = generateUUID()
     // 先上传文件，拿到fileId
-    const fileId = await uploadFile(file, userId, "Bearer app-dAtXcYbLKmh7dU6nQ8ZxEtnJ")
+    const fileId = await uploadFile(file, userId, 'Bearer ' + localStorage.getItem('partyKey') )
     if (fileId) {
       // 再调用工作流
-      const response = await runWorkflow(fileId, userId, "Bearer app-dAtXcYbLKmh7dU6nQ8ZxEtnJ")
+      const response = await runWorkflow(fileId, userId, 'Bearer ' + localStorage.getItem('partyKey') )
       const jsonObject = extractJsonObject(response)
       // 自动填充当事人相关表单字段
       if (jsonObject) {
@@ -232,7 +232,7 @@ async function polishFactReason() {
   const userId = generateUUID()
   const headers = {
     "Content-Type": "application/json",
-    "Authorization": "Bearer app-CfH0z6KLpeHOQDamkFc9RHNk"
+    "Authorization": 'Bearer ' + localStorage.getItem('aiKey')
   };
   try {
     // 正确传递 factReason.value，避免循环引用
@@ -461,6 +461,11 @@ const downloadTemplate = () => {
   document.body.removeChild(link)
 }
 
+// 检查秘钥是否为空
+const isLawyerKeyEmpty = computed(() => !localStorage.getItem('lawyerKey'))
+const isPartyKeyEmpty = computed(() => !localStorage.getItem('partyKey'))
+const isAiKeyEmpty = computed(() => !localStorage.getItem('aiKey'))
+
 </script>
 
 <template>
@@ -494,7 +499,7 @@ const downloadTemplate = () => {
         <div class="form-section">
           <div class="section-title-row">
             <div class="section-title">当事人信息</div>
-            <button type="button" class="upload-btn" :class="{ 'uploading': isUploadingParty }" :disabled="isUploadingParty" @click="uploadPartyFile">
+            <button type="button" class="upload-btn" :class="{ 'uploading': isUploadingParty, 'disabled': isPartyKeyEmpty }" :disabled="isUploadingParty || isPartyKeyEmpty" @click="uploadPartyFile">
               {{ isUploadingParty ? '正在录入' : '录入文件信息' }}
             </button>
             <input ref="partyFileInput" type="file" style="display:none" @change="handlePartyFileChange" />
@@ -569,7 +574,7 @@ const downloadTemplate = () => {
         <div class="form-section">
           <div class="section-title-row">
             <div class="section-title">律师信息</div>
-            <button type="button" class="upload-btn" :class="{ 'uploading': isUploadingLawyer }" :disabled="isUploadingLawyer" @click="uploadLawyerFile">
+            <button type="button" class="upload-btn" :class="{ 'uploading': isUploadingLawyer, 'disabled': isLawyerKeyEmpty }" :disabled="isUploadingLawyer || isLawyerKeyEmpty" @click="uploadLawyerFile">
               {{ isUploadingLawyer ? '正在录入' : '录入文件信息' }}
             </button>
             <input ref="lawyerFileInput" type="file" style="display:none" @change="handleLawyerFileChange" />
@@ -603,7 +608,7 @@ const downloadTemplate = () => {
           <label>事实和理由</label>
           <div class="fact-reason-flex">
             <textarea v-model="factReason" class="fact-reason-textarea" placeholder="请输入事实和理由"></textarea>
-            <button type="button" class="ai-polish-btn" :class="{ 'uploading': isPolishing }" :disabled="isPolishing" @click="polishFactReason">
+            <button type="button" class="ai-polish-btn" :class="{ 'uploading': isPolishing, 'disabled': isAiKeyEmpty }" :disabled="isPolishing || isAiKeyEmpty" @click="polishFactReason">
               {{ isPolishing ? '正在生成' : 'AI辅助润色' }}
             </button>
           </div>
@@ -863,16 +868,14 @@ const downloadTemplate = () => {
 .download-btn:hover {
   background: #337ecc;
 }
-.upload-btn:disabled {
-  background: #c0c4cc;
+.upload-btn.disabled,
+.ai-polish-btn.disabled {
+  background: #c0c4cc !important;
   cursor: not-allowed;
+  opacity: 0.6;
 }
 .upload-btn.uploading {
   background: #c0c4cc;
-}
-.ai-polish-btn:disabled {
-  background: #c0c4cc;
-  cursor: not-allowed;
 }
 .ai-polish-btn.uploading {
   background: #c0c4cc;
